@@ -1,17 +1,17 @@
 # -- coding: utf-8 --
 
 # -----------------------------------------------------
-# خادم Flask لمحاكاة واجهة AI التربة بدون نموذج حقيقي.
+# خادم Flask لتقديم الـ HTML (Frontend) ونقاط نهاية الـ API (Backend)
 # -----------------------------------------------------
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template # استيراد render_template
 from flask_cors import CORS
 import os
 import random
-import time # تم إضافة لاستخدامه في التقرير
+import time 
 
 # -----------------------------------------------------
-# ثوابت وبيانات
+# ثوابت وبيانات (لم يتم تغيير هذا الجزء)
 # -----------------------------------------------------
 
 APP_ID = 'soil_agent_app'
@@ -19,7 +19,6 @@ BASE_IMAGE_DIR = ''
 IMG_SIZE = (224, 224)
 CLASS_NAMES = ['Alluvial_Soil','Black_Soil','Laterite_Soil','Red_Soil','Yellow_Soil']
 
-# بيانات المحاصيل
 CROP_PROPERTIES = {
     'تمر': [0.4, 0.7, 0.9, 8000],
     'عنب': [0.6, 0.5, 0.7, 15000],
@@ -57,7 +56,7 @@ PREF_OPTIONS_MAP = {
 GLOBAL_HISTORICAL_ANALYSIS = None
 
 # -----------------------------------------------------
-# دوال المحاكاة
+# دوال المحاكاة (لم يتم تغيير هذا الجزء)
 # -----------------------------------------------------
 
 def predict_soil_type(image_path):
@@ -101,9 +100,7 @@ def determine_suitability(soil_type, area_sqm, prev_crops_str, farmer_pref, desi
             base_score *= (1 + profit_ratio * 0.3)
         elif farmer_pref == 'low_water':
             base_score *= (1 + (1 - water_need) * 0.3)
-        # تمكين الاستفادة من التحليل التاريخي هنا
         elif farmer_pref == 'improve_efficiency' and historical_analysis and 'water_efficiency_ratio' in historical_analysis:
-            # مثال: زيادة النتيجة بناءً على كفاءة الماء التاريخية
             base_score *= (1 + historical_analysis.get('water_efficiency_ratio', 0) * 0.05) 
 
         if crop.lower() in prev_crops:
@@ -123,10 +120,7 @@ def generate_detailed_report(selected_crop, area_sqm, soil_type, location_name, 
     details = CROP_PROPERTIES.get(selected_crop)
     current_score = next((r['score'] for r in recommendations if r['crop'] == selected_crop), 0.0)
 
-    # التحقق من وجود بيانات للمحصول المحدد
     if not details:
-        # إذا لم يتم العثور على المحصول في بيانات CROP_PROPERTIES
-        # يجب أن يكون هذا المحصول مختاراً من قائمة التوصيات
         return "خطأ: لا توجد بيانات تفصيلية (CROP_PROPERTIES) للمحصول المحدد. يرجى اختيار محصول من القائمة المقترحة."
 
     base_cost_per_ha = sum(BASE_COSTS_PER_HA.values())
@@ -144,7 +138,6 @@ def generate_detailed_report(selected_crop, area_sqm, soil_type, location_name, 
         'Yellow_Soil': 'تربة صفراء'
     }.get(soil_type, 'غير محدد')
     
-    # تنسيق التاريخ والوقت بشكل أفضل
     report_date = time.strftime("%Y-%m-%d %H:%M:%S")
 
     report = f"""
@@ -180,28 +173,24 @@ III. المؤشرات الزراعية
 # خادم Flask
 # -----------------------------------------------------
 
-app = Flask(__name__)
-# تم تعديل CORS للسماح بجميع الأصول (مناسب لبيئة Render)
+# تهيئة Flask مع تحديد مسار مجلد الـ templates
+app = Flask(__name__, template_folder='templates') 
 CORS(app) 
-# في ملف web_agent.py بعد سطر CORS(app)
 
+# ↓↓↓↓↓↓↓↓↓↓↓↓↓ تم إضافة هذا لتقديم الـ HTML ↓↓↓↓↓↓↓↓↓↓↓↓↓
 @app.route('/', methods=['GET'])
 def home():
-    """الرد على طلبات GET للمسار الأساسي (Health Check)."""
-    return jsonify({
-        "status": "OK",
-        "message": "Soil Agent API is running.",
-        "version": "1.0"
-    }), 200
+    """الرد على طلبات GET للمسار الأساسي لتقديم الواجهة الأمامية."""
+    # يجب أن يكون ملف index_final.html موجودًا في مجلد templates/
+    return render_template('index_final.html')
+# ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
 @app.route('/api/analyze_soil', methods=['POST'])
 def api_analyze_soil():
-# ... (بقية الكود)
     data = request.json
     try:
-        # ملاحظة: تم تعديل طريقة استخراج البيانات لضمان عدم حدوث خطأ إذا كانت فارغة
         image_path = data.get('image_path')
-        area_sqm = float(data.get('area_sqm', 10000)) # افتراض قيمة إذا كانت مفقودة
+        area_sqm = float(data.get('area_sqm', 10000)) 
         prev_crops_str = data.get('prev_crops_str', '')
         farmer_pref = data.get('farmer_pref', 'none')
         desired_crop = data.get('desired_crop', '')
@@ -220,7 +209,6 @@ def api_generate_plan():
     data = request.json
     try:
         selected_crop = data.get('selected_crop')
-        # تحقق إضافي لضمان وجود المحصول قبل إرساله للتقرير
         if not selected_crop or selected_crop not in CROP_PROPERTIES:
             return jsonify({'error': "لم يتم تحديد المحصول بشكل صحيح أو لا توجد بيانات لهذا المحصول."}), 400
             
@@ -237,7 +225,6 @@ def api_generate_plan():
     except Exception as e:
         return jsonify({'error': f"خطأ في توليد الخطة: {str(e)}"}), 500
 
-# تم إضافة هذه الدالة لحل مشكلة 404
 @app.route('/api/analyze_historical', methods=['POST'])
 def api_analyze_historical():
     global GLOBAL_HISTORICAL_ANALYSIS
@@ -247,17 +234,12 @@ def api_analyze_historical():
         area_sqm = float(data.get('area_sqm', 10000))
         actual_water = float(data.get('actual_water', 1)) 
         
-        if actual_water <= 0:
-             return jsonify({'error': "يجب أن تكون كمية الماء المستخدم أكبر من صفر."}), 400
-        if actual_yield <= 0:
-             return jsonify({'error': "يجب أن يكون المردود الفعلي أكبر من صفر."}), 400
+        if actual_water <= 0 or actual_yield <= 0:
+             return jsonify({'error': "يجب أن تكون كمية الماء والمردود أكبر من صفر."}), 400
              
         area_ha = area_sqm / 10000
-        
-        # حساب كفاءة الماء (المردود لكل م³ ماء)
         water_efficiency_ratio = (actual_yield / area_ha) / actual_water
         
-        # تحديث المتغير العام
         GLOBAL_HISTORICAL_ANALYSIS = {
             'previous_crop': data.get('crop'),
             'water_efficiency_ratio': water_efficiency_ratio,
@@ -270,10 +252,7 @@ def api_analyze_historical():
         return jsonify({'error': f"خطأ في معالجة البيانات التاريخية: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    print("-----------------------------------------------------")
-    print("تم تشغيل المحاكاة بنجاح.")
-    print("-----------------------------------------------------")
-    # إذا كنت تستخدم Render، تأكد من أنك تستخدم gunicorn أو waitress بدلاً من app.run(debug=True)
-    # على سبيل المثال: app.run(host='0.0.0.0', port=os.environ.get('PORT', 5000))
+    # لتشغيل Render، قد تحتاج إلى إضافة 'host='0.0.0.0'
     app.run(debug=True)
+
 
