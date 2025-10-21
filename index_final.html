@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>وكيل التربة التفاعلي والمحاصيل</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Noto+Kufi+Arabic:wght@100..900&display=swap');
+        
+        body {
+            font-family: 'Noto Kufi Arabic', 'Inter', sans-serif;
+            background-color: #f8fbf8; 
+            color: #1a2e31; 
+        }
+        .card {
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e5e7eb;
+            transition: transform 0.2s;
+        }
+        .log-area {
+            /* تعديل الارتفاع: لضمان التمدد ليغطي ارتفاع المرحلتين 3 و 4 */
+            min-height: 480px; 
+            background-color: #1a2e31; 
+            color: #e2e8f0; 
+            border: 1px solid #4ade80;
+        }
+        .report-area {
+            min-height: 400px;
+            background-color: #f0fdf4; 
+            border: 1px solid #4ade80;
+            color: #1a2e31; 
+        }
+        .loading-ring {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #10b981; 
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="app" class="max-w-7xl mx-auto">
+        
+        <header class="text-center mb-10 p-6 rounded-xl bg-green-100 border border-green-300">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-green-700">🌿 وكيل التربة والمحاصيل الذكي 🔬</h1>
+            <p class="mt-2 text-lg text-gray-600">تحليل متقدم للتربة وتوليد خطط مالية واستثمارية للمحاصيل الزراعية.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            
+            <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <div class="card p-6 rounded-xl">
+                    <h2 class="text-xl font-bold mb-4 flex items-center text-green-700">
+                        <i data-lucide="image" class="w-5 h-5 ml-2"></i> الخطوة 1: بيانات التربة والمساحة
+                    </h2>
+                    <label for="imageUpload" class="block text-sm font-medium text-gray-600 mb-2">تحميل صورة التربة (الدرون)</label>
+                    <input type="file" id="imageUpload" class="w-full text-sm text-gray-600
+                        file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0
+                        file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-700
+                        hover:file:bg-green-600/30" onchange="handleImageUpload()">
+                    <p id="imageStatus" class="mt-1 text-xs text-gray-500">❌ لم يتم تحميل صورة</p>
+
+                    <label for="area_sqm" class="block text-sm font-medium text-gray-600 mt-4 mb-2">مساحة الحقل (متر مربع)</label>
+                    <input type="number" id="area_sqm" value="10000" min="1" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-green-500 focus:ring-green-500 text-left" dir="ltr" oninput="updateAppState('area_sqm', this.value)">
+                </div>
+
+                <div class="card p-6 rounded-xl">
+                    <h2 class="text-xl font-bold mb-4 flex items-center text-green-700">
+                        <i data-lucide="map-pin" class="w-5 h-5 ml-2"></i> الخطوة 2: الموقع والسجل الزراعي
+                    </h2>
+                    <label for="location_name" class="block text-sm font-medium text-gray-600 mb-2">اسم الموقع (مثال: Ouargla, Algeria)</label>
+                    <input type="text" id="location_name" value="Ouargla, Algeria" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-green-500 focus:ring-green-500 text-left" dir="ltr" oninput="updateAppState('location_name', this.value)">
+                    
+                    <label for="prev_crops" class="block text-sm font-medium text-gray-600 mt-4 mb-2">محاصيل سابقة (مفصولة بفواصل)</label>
+                    <input type="text" id="prev_crops" value="تمر, قمح_صلب" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-green-500 focus:ring-green-500" oninput="updateAppState('prev_crops_str', this.value)">
+                </div>
+            
+                <div class="card p-6 rounded-xl">
+                    <h2 class="text-xl font-bold mb-4 flex items-center text-green-700">
+                        <i data-lucide="award" class="w-5 h-5 ml-2"></i> الخطوة 3: الأفضلية والمحصول المستهدف
+                    </h2 >
+                    <label for="farmer_pref" class="block text-sm font-medium text-gray-600 mb-2">أولوية الفلاح</label>
+                    <select id="farmer_pref" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-green-500 focus:ring-green-500" onchange="updateAppState('farmer_pref', this.value)">
+                        <option value="high_profit">زيادة الأرباح المالية</option>
+                        <option value="low_water">استهلاك ماء منخفض</option>
+                        <option value="improve_efficiency">تحسين كفاءة الأداء</option>
+                        <option value="none" selected>لا شيء (معايير عامة)</option>
+                    </select>
+
+                    <label for="desired_crop" class="block text-sm font-medium text-gray-600 mt-4 mb-2">المحصول المرغوب (اختياري)</label>
+                    <input type="text" id="desired_crop" value="" placeholder="مثل: زيتون" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-green-500 focus:ring-green-500" oninput="updateAppState('desired_crop', this.value)">
+                </div>
+                
+                <div class="card p-6 rounded-xl bg-yellow-100/30 border-yellow-300/80">
+                    <h2 class="text-xl font-bold mb-4 flex items-center text-yellow-700">
+                        <i data-lucide="clock-history" class="w-5 h-5 ml-2"></i> الخطوة 4: تحليل الأداء التاريخي (اختياري)
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-3">أدخل بيانات موسم سابق لزيادة دقة الخطة المالية.</p>
+                    <button onclick="promptHistoricalData()" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200" id="btn-historical">
+                        تحليل الأداء التاريخي السابق
+                    </button>
+                    <p id="historicalStatus" class="mt-2 text-xs text-gray-500 text-center">لم يتم إدخال بيانات تاريخية.</p>
+                </div>
+            </div>
+            
+            <div class="lg:col-span-1">
+                
+                <div class="card p-6 rounded-xl h-full flex flex-col">
+                    <h2 class="text-xl font-bold mb-3 flex items-center text-gray-700">
+                        <i data-lucide="square-terminal" class="w-5 h-5 ml-2"></i> سجل المخرجات والإشعارات
+                    </h2>
+                    <div id="logOutput" class="log-area p-3 rounded-lg overflow-y-scroll text-sm whitespace-pre-wrap text-left font-mono flex-grow">
+                        <p class="text-green-400">
+                            > تم تهيئة وكيل التربة بنجاح.
+                        </p>
+                        <p class="text-blue-400">
+                            > 🌐 تم ربط الواجهة بخادم Flask API (web_agent.py).
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        
+        <div class="card p-6 rounded-xl lg:col-span-3 mb-6">
+            <h2 class="text-xl font-bold mb-4 flex items-center text-green-700">
+                <i data-lucide="layers-3" class="w-5 h-5 ml-2"></i> الخطوة 5: التحليل الأولي والتوصية
+            </h2>
+            <button onclick="analyzeSoil()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 mb-4" id="btn-analyze">
+                بدء تحليل التربة وتقديم التوصية
+            </button>
+            
+            <div id="recommendation-results" class="hidden">
+                <label for="selected_crop" class="block text-sm font-medium text-gray-600 mb-2">المحصول المقترح (لإعداد الخطة)</label>
+                <select id="selected_crop" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-green-500 focus:ring-green-500" onchange="updateAppState('selected_crop', this.value)">
+                    <option value="">-- اختر محصولاً من التوقعات --</option>
+                </select>
+                <p id="suitability-score" class="mt-2 text-sm font-semibold text-gray-600"></p>
+            </div>
+        </div>
+
+        <div class="card p-6 rounded-xl bg-yellow-100/30 border-yellow-300/80 lg:col-span-3 mb-6">
+            <h2 class="text-xl font-bold mb-4 flex items-center text-yellow-700">
+                <i data-lucide="clipboard-list" class="w-5 h-5 ml-2"></i> الخطوة 6: توليد خطة العمل والتكاليف
+            </h2>
+            <button onclick="generateDetailedPlan()" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 disabled:bg-gray-500" id="btn-generate-plan" disabled>
+                توليد وتصدير خطة العمل والربح
+            </button>
+        </div>
+        
+        <div class="card p-6 rounded-xl report-area lg:col-span-3">
+            <h2 class="text-xl font-bold mb-3 flex items-center text-gray-700">
+                <i data-lucide="file-text" class="w-5 h-5 ml-2"></i> تقرير الخطة التفصيلية
+            </h2>
+            <pre id="detailedReportOutput" class="report-area p-3 rounded-lg overflow-auto text-sm bg-gray-100 border border-gray-300">التقرير النهائي سيظهر هنا بعد التوليد...</pre>
+            
+            <div id="satisfaction-rating" class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg text-center hidden">
+                <p class="text-lg font-bold text-green-700 mb-2">نسبة رضى العميل</p>
+                <div class="flex justify-center space-x-4 space-x-reverse">
+                    <button onclick="rateApp(5)" class="text-3xl hover:scale-110 transition duration-200" title="راضٍ جداً">⭐</button>
+                    <button onclick="rateApp(4)" class="text-3xl hover:scale-110 transition duration-200" title="راضٍ">⭐</button>
+                    <button onclick="rateApp(3)" class="text-3xl hover:scale-110 transition duration-200" title="محايد">⭐</button>
+                    <button onclick="rateApp(2)" class="text-3xl hover:scale-110 transition duration-200" title="غير راضٍ">⭐</button>
+                    <button onclick="rateApp(1)" class="text-3xl hover:scale-110 transition duration-200" title="غير راضٍ جداً">⭐</button>
+                </div>
+                <p id="rating-message" class="mt-2 text-sm text-gray-600"></p>
+            </div>
+        </div>
+
+    </div>
+    
+    <div id="modal-container"></div>
+
+
+    <script>
+        // -------------------- إعدادات وثوابت --------------------
+        const BASE_API_URL = 'http://127.0.0.1:5000';
+        
+        // حالة التطبيق (ذاكرة) - يتم تخزين نتائج API مؤقتاً هنا
+        let appState = {
+            image_path: null,
+            soil_type: null,
+            recommendations: [],
+            area_sqm: 10000,
+            selected_crop: null, 
+            historical_analysis: null,
+            prev_crops_str: "تمر, قمح_صلب",
+            location_name: "Ouargla, Algeria",
+            farmer_pref: "high_profit",
+            desired_crop: ""
+        };
+
+        // -------------------- أدوات واجهة المستخدم --------------------
+
+        function log(message, color = "normal") {
+            const logElement = document.getElementById('logOutput');
+            const colorMap = {
+                "normal": "text-gray-300", "error": "text-red-400", 
+                "success": "text-green-400", "warning": "text-yellow-400", 
+                "info": "text-blue-400", "detail": "text-purple-400"
+            };
+            
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            
+            const p = document.createElement('p');
+            p.className = `${colorMap[color] || colorMap['normal']}`;
+            p.textContent = `[${time}] - ${message}`;
+            
+            logElement.appendChild(p);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // دالة عرض النافذة المنبثقة
+        function showModal(title, content, onSave) {
+            const modalContainer = document.getElementById('modal-container');
+            
+            modalContainer.innerHTML = `
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div class="bg-white p-6 rounded-xl w-full max-w-md border border-gray-300 shadow-2xl">
+                        <h3 class="text-xl font-bold mb-4 text-gray-800">${title}</h3>
+                        <div class="mb-4 text-gray-600">${content}</div>
+                        <div class="flex justify-end space-x-2 space-x-reverse"> 
+                            <button id="modal-save" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">حفظ وتحليل</button>
+                            <button id="modal-cancel" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-200">إلغاء</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const modalRoot = modalContainer.querySelector('.fixed.inset-0'); 
+            const saveButton = modalRoot.querySelector('#modal-save');
+            const cancelButton = modalRoot.querySelector('#modal-cancel');
+
+            cancelButton.onclick = () => {
+                modalContainer.innerHTML = '';
+                log("تم إلغاء عملية إدخال البيانات التاريخية.", "warning");
+            };
+
+            saveButton.onclick = () => {
+                const values = {};
+                modalRoot.querySelectorAll('input').forEach(input => {
+                    values[input.id.replace('modal-', '')] = input.value;
+                });
+                onSave(values);
+                modalContainer.innerHTML = ''; 
+            };
+        }
+
+        function rateApp(rating) {
+            const ratingMessage = document.getElementById('rating-message');
+            let message = "";
+            switch(rating) {
+                case 5: message = "شكراً لك! يسعدنا جداً أنك راضٍ عن الخدمة. ⭐⭐⭐⭐⭐"; break;
+                case 4: message = "شكراً لك. نحن نعمل جاهدين لتحسين تجربتك."; break;
+                case 3: message = "نقدر رأيك. كيف يمكننا أن نكون أفضل؟"; break;
+                case 2: message = "نعتذر لذلك. يرجى إرسال ملاحظاتك لمساعدتنا في التحسين."; break;
+                case 1: message = "نعتذر بشدة. سنعمل على إصلاح المشكلات بسرعة."; break;
+            }
+            ratingMessage.textContent = message;
+            
+            const stars = document.querySelectorAll('#satisfaction-rating button');
+            stars.forEach((star, index) => {
+                const starIndex = 5 - index; 
+                if (starIndex <= rating) {
+                    star.style.opacity = '1';
+                } else {
+                    star.style.opacity = '0.3'; 
+                }
+            });
+        }
+
+
+        // -------------------- دوال التفاعل مع API --------------------
+
+        async function promptHistoricalData() {
+            showModal(
+                "تحليل الأداء التاريخي",
+                `
+                <p class="mb-4 text-gray-600">أدخل بيانات موسم زراعي سابق لزيادة دقة التوصيات المالية.</p>
+                <label class="block text-sm font-medium text-gray-700 mb-1">المحصول السابق الذي تم زرعه (مثال: تمر):</label>
+                <input type="text" id="modal-crop" value="تمر" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-yellow-500 mb-3 text-left" dir="ltr">
+                <label class="block text-sm font-medium text-gray-700 mb-1">المردود الفعلي (كغم):</label>
+                <input type="number" id="modal-yield" value="7500" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-yellow-500 mb-3 text-left" dir="ltr">
+                <label class="block text-sm font-medium text-gray-700 mb-1">الماء المستخدم (م³):</label>
+                <input type="number" id="modal-water" value="4800" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-yellow-500 mb-3 text-left" dir="ltr">
+                <label class="block text-sm font-medium text-gray-700 mb-1">الربح الصافي الفعلي (د.ج):</label>
+                <input type="number" id="modal-profit" value="2500000" class="w-full p-2 rounded-lg bg-gray-100 border border-gray-300 focus:border-yellow-500 mb-3 text-left" dir="ltr">
+                `,
+                async (values) => {
+                    const yieldVal = parseFloat(values.yield);
+                    if (!values.crop || yieldVal <= 0) {
+                        log("❌ فشل إدخال البيانات التاريخية. يرجى التأكد من إدخال المحصول والمردود.", "error");
+                        document.getElementById('historicalStatus').textContent = `❌ فشل تحليل البيانات.`;
+                        return;
+                    }
+
+                    const btn = document.getElementById('btn-historical');
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = `<div class="loading-ring ml-2"></div> جاري تحليل التاريخ...`;
+                    btn.disabled = true;
+
+                    const payload = {
+                        crop: values.crop,
+                        area_sqm: appState.area_sqm,
+                        actual_yield: yieldVal,
+                        actual_water: parseFloat(values.water) || 0,
+                        actual_profit: parseFloat(values.profit) || 0
+                    };
+
+                    try {
+                        const response = await axios.post(`${BASE_API_URL}/api/analyze_historical`, payload); 
+                        appState.historical_analysis = response.data;
+                        document.getElementById('historicalStatus').textContent = `✅ تم تحليل: ${values.crop}.`;
+                        log(`تم تحليل الأداء التاريخي لـ ${values.crop}.`, "success");
+                        log(appState.historical_analysis.message, "detail");
+
+                    } catch (error) {
+                        log(`❌ خطأ في API تحليل التاريخ: ${error.response?.status} - ${error.response?.data?.error || error.message}`, "error");
+                        document.getElementById('historicalStatus').textContent = `❌ فشل تحليل البيانات التاريخية.`;
+                        appState.historical_analysis = null;
+                    } finally {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }
+                }
+            );
+        }
+
+        async function analyzeSoil() {
+            log("--- بدء عملية التحليل الكلي عبر API ---", "info");
+            const btn = document.getElementById('btn-analyze');
+            const resultsDiv = document.getElementById('recommendation-results');
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loading-ring ml-2"></div> جاري تحليل التربة والمحاصيل...`;
+            resultsDiv.classList.add('hidden');
+            document.getElementById('btn-generate-plan').disabled = true;
+            document.getElementById('satisfaction-rating').classList.add('hidden'); 
+
+            const payload = {
+                image_path: appState.image_path,
+                area_sqm: appState.area_sqm,
+                prev_crops_str: appState.prev_crops_str,
+                farmer_pref: appState.farmer_pref,
+                desired_crop: appState.desired_crop,
+            };
+
+            try {
+                const response = await axios.post(`${BASE_API_URL}/api/analyze_soil`, payload); 
+                const data = response.data;
+                
+                appState.soil_type = data.soil_type;
+                appState.recommendations = data.recommendations;
+                
+                log(`✅ اكتمل تحليل API. نوع التربة المتوقع: ${data.soil_type}.`, "success");
+
+                const select = document.getElementById('selected_crop');
+                select.innerHTML = '<option value="">-- اختر محصولاً من التوقعات --</option>';
+                
+                const topRecommendations = data.recommendations.slice(0, 5);
+                topRecommendations.forEach((item, index) => {
+                    const option = document.createElement('option');
+                    option.value = item.crop;
+                    option.textContent = `${index + 1}. ${item.crop} (${item.score.toFixed(1)}% ملاءمة)`;
+                    select.appendChild(option);
+                });
+                
+                if (topRecommendations.length > 0) {
+                    appState.selected_crop = topRecommendations[0].crop;
+                    select.value = topRecommendations[0].crop;
+                    document.getElementById('suitability-score').textContent = 
+                        `التربة: ${appState.soil_type} | المحصول الموصى به: ${appState.selected_crop} (${topRecommendations[0].score.toFixed(1)}%)`;
+                    document.getElementById('btn-generate-plan').disabled = false;
+                    resultsDiv.classList.remove('hidden');
+                } else {
+                    appState.selected_crop = null;
+                    document.getElementById('suitability-score').textContent = `لم يتم العثور على توصيات ملائمة.`;
+                }
+
+                log("--- اكتمل التحليل الكلي بنجاح ---", "success");
+
+            } catch (error) {
+                log(`❌ خطأ في API التحليل: ${error.response?.status} - ${error.response?.data?.error || error.message}`, "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `بدء تحليل التربة وتقديم التوصية`;
+            }
+        }
+
+        async function generateDetailedPlan() {
+            if (!appState.selected_crop) {
+                log("❌ يرجى اختيار محصول مقترح أولاً.", "error");
+                return;
+            }
+            
+            log(`--- بدء توليد الخطة التفصيلية لمحصول ${appState.selected_crop} عبر API ---`, "info");
+            const btn = document.getElementById('btn-generate-plan');
+            const reportOutput = document.getElementById('detailedReportOutput');
+            
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loading-ring ml-2"></div> جاري توليد التقرير...`;
+            reportOutput.textContent = "جاري تجميع البيانات وتوليد تقرير الخطة المالية والزراعية...";
+
+            const payload = {
+                selected_crop: appState.selected_crop,
+                area_sqm: appState.area_sqm,
+                soil_type: appState.soil_type,
+                location_name: appState.location_name,
+                recommendations: appState.recommendations,
+                farmer_pref_display: document.getElementById('farmer_pref').options[document.getElementById('farmer_pref').selectedIndex].text
+            };
+
+            try {
+                const response = await axios.post(`${BASE_API_URL}/api/generate_plan`, payload); 
+                const reportText = response.data.report;
+
+                reportOutput.textContent = reportText.trim();
+                log("✅ تم توليد الخطة التفصيلية والمالية بنجاح. يرجى مراجعة التقرير.", "success");
+                document.getElementById('satisfaction-rating').classList.remove('hidden'); 
+
+                // إضافة زر نسخ
+                const copyButton = document.createElement('button');
+                copyButton.className = 'w-full mt-4 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center';
+                copyButton.innerHTML = `<i data-lucide="copy" class="w-4 h-4 ml-2"></i> نسخ التقرير`;
+                copyButton.onclick = () => {
+                    const tempTextArea = document.createElement('textarea');
+                    tempTextArea.value = reportOutput.textContent;
+                    document.body.appendChild(tempTextArea);
+                    tempTextArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempTextArea);
+                    log("✅ تم نسخ التقرير إلى الحافظة.", "success");
+                    lucide.createIcons();
+                };
+                
+                const reportContainer = document.getElementById('detailedReportOutput').parentNode;
+                const existingCopyButton = reportContainer.querySelector('.copy-report-btn');
+                if (existingCopyButton) {
+                    existingCopyButton.remove();
+                }
+                copyButton.className += ' copy-report-btn';
+                reportContainer.insertBefore(copyButton, document.getElementById('satisfaction-rating'));
+                lucide.createIcons();
+
+
+            } catch (error) {
+                log(`❌ خطأ في API توليد الخطة: ${error.response?.status} - ${error.response?.data?.error || error.message}`, "error");
+                reportOutput.textContent = `خطأ في توليد التقرير: ${error.response?.data?.error || 'فشل الاتصال بالخادم.'}`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `توليد وتصدير خطة العمل والربح`;
+            }
+        }
+
+        // -------------------- معالجات الأحداث (Initialization) --------------------
+
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+            initializeApp();
+        });
+
+        function initializeApp() {
+             // تحديث حالة التطبيق الأولية من واجهة المستخدم
+            appState.area_sqm = parseFloat(document.getElementById('area_sqm').value);
+            appState.location_name = document.getElementById('location_name').value;
+            appState.prev_crops_str = document.getElementById('prev_crops').value;
+            appState.farmer_pref = document.getElementById('farmer_pref').value;
+            appState.desired_crop = document.getElementById('desired_crop').value;
+            document.getElementById('selected_crop').addEventListener('change', (e) => updateAppState('selected_crop', e.target.value));
+        }
+
+        function updateAppState(key, value) {
+            if (key === 'area_sqm') {
+                appState[key] = parseFloat(value) || 0;
+            } else {
+                appState[key] = value;
+            }
+            
+            if (key === 'selected_crop') {
+                const selected = appState.recommendations.find(r => r.crop === value);
+                if (selected) {
+                    document.getElementById('suitability-score').textContent = 
+                        `التربة: ${appState.soil_type} | المحصول المختار: ${selected.crop} (${selected.score.toFixed(1)}%)`;
+                }
+                document.getElementById('btn-generate-plan').disabled = !value;
+            }
+        }
+        
+        function handleImageUpload() {
+            const fileInput = document.getElementById('imageUpload');
+            const imageStatus = document.getElementById('imageStatus');
+            if (fileInput.files.length > 0) {
+                const fileName = fileInput.files[0].name;
+                // يرسل اسم الملف فقط إلى Flask. Flask سيضيف المسار الأساسي (BASE_IMAGE_DIR)
+                appState.image_path = fileName; 
+                imageStatus.innerHTML = `✅ تم تحميل الصورة: <span class="text-green-600">${fileName}</span>`;
+                log(`تم تحميل الصورة: ${fileName}.`, "success");
+            } else {
+                appState.image_path = null;
+                imageStatus.innerHTML = `❌ لم يتم تحميل صورة`;
+            }
+        }
+    </script>
+</body>
+</html>
