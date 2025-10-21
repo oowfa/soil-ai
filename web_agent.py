@@ -1,23 +1,24 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 # -----------------------------------------------------
-# خادم Flask لمحاكاة واجهة AI التربة بدون نموذج حقيقي.
+# خادم Flask لمحاكاة واجهة AI التربة بدون نموذج حقيقي
 # -----------------------------------------------------
 
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import os
 import random
+from werkzeug.utils import secure_filename
 
 # -----------------------------------------------------
 # ثوابت وبيانات
 # -----------------------------------------------------
 APP_ID = 'soil_agent_app'
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-BASE_IMAGE_DIR = ''  # الآن لا نستخدم نموذج، يمكن تركه فارغاً
 IMG_SIZE = (224, 224)
 CLASS_NAMES = ['Alluvial_Soil','Black_Soil','Laterite_Soil','Red_Soil','Yellow_Soil']
 
-# بيانات المحاصيل
 CROP_PROPERTIES = {
     'تمر': [0.4, 0.7, 0.9, 8000],
     'عنب': [0.6, 0.5, 0.7, 15000],
@@ -57,9 +58,7 @@ GLOBAL_HISTORICAL_ANALYSIS = None
 # -----------------------------------------------------
 def predict_soil_type(image_path=None):
     """إرجاع نوع تربة عشوائي دائمًا بدون تحليل الصورة."""
-    import random
     return random.choice(CLASS_NAMES)
-
 
 def determine_suitability(soil_type, area_sqm, prev_crops_str, farmer_pref, desired_crop, historical_analysis=None):
     area_ha = area_sqm / 10000
@@ -141,7 +140,6 @@ def generate_detailed_report(selected_crop, area_sqm, soil_type, location_name, 
 | **إجمالي التكاليف** | **{total_cost:,.0f}** |
 | **الربح الصافي المتوقع** | **{net_profit:,.0f} |
 
-
 ## III. المؤشرات الزراعية
 | المؤشر | القيمة | الوحدة |
 | :--- | :--- | :--- |
@@ -158,21 +156,30 @@ def generate_detailed_report(selected_crop, area_sqm, soil_type, location_name, 
 # -----------------------------------------------------
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# صفحة رئيسية بسيطة
+# صفحة رئيسية
 @app.route('/')
 def home():
     return render_template('index_final.html')
 
+# تحليل التربة
 @app.route('/api/analyze_soil', methods=['POST'])
 def api_analyze_soil():
-    data = request.json
     try:
-        image_path = data.get('image_path')
-        area_sqm = float(data.get('area_sqm'))
-        prev_crops_str = data.get('prev_crops_str', '')
-        farmer_pref = data.get('farmer_pref')
-        desired_crop = data.get('desired_crop')
+        # استقبال الصورة
+        if 'image' in request.files:
+            f = request.files['image']
+            filename = secure_filename(f.filename)
+            image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            f.save(image_path)
+        else:
+            image_path = "random.jpg"
+
+        area_sqm = float(request.form.get('area_sqm', 1000))
+        prev_crops_str = request.form.get('prev_crops_str', '')
+        farmer_pref = PREF_OPTIONS_MAP.get(request.form.get('farmer_pref'), 'none')
+        desired_crop = request.form.get('desired_crop', None)
 
         soil_type = predict_soil_type(image_path)
         recommendations = determine_suitability(
@@ -183,15 +190,15 @@ def api_analyze_soil():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# توليد خطة مفصلة
 @app.route('/api/generate_plan', methods=['POST'])
 def api_generate_plan():
-    data = request.json
     try:
-        selected_crop = data.get('selected_crop')
-        area_sqm = float(data.get('area_sqm'))
-        soil_type = data.get('soil_type')
-        location_name = data.get('location_name')
-        recommendations = data.get('recommendations', [])
+        selected_crop = request.form.get('selected_crop')
+        area_sqm = float(request.form.get('area_sqm', 1000))
+        soil_type = request.form.get('soil_type', 'Alluvial_Soil')
+        location_name = request.form.get('location_name', 'الموقع الافتراضي')
+        recommendations = []  # يمكن توسيعها لاحقًا
 
         report_text = generate_detailed_report(
             selected_crop, area_sqm, soil_type, location_name, recommendations, GLOBAL_HISTORICAL_ANALYSIS
@@ -203,10 +210,6 @@ def api_generate_plan():
 
 if __name__ == '__main__':
     print("-----------------------------------------------------")
-    print("تم تشغيل المحاكاة بنجاح على http://127.0.0.1:5000")
+    print("تم تشغيل المحاكاة بنجاح على http://0.0.0.0:5000")
     print("-----------------------------------------------------")
     app.run(host='0.0.0.0', port=5000, debug=True)
-
-
-
-
