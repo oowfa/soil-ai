@@ -183,9 +183,20 @@ III. المؤشرات الزراعية
 app = Flask(__name__)
 # تم تعديل CORS للسماح بجميع الأصول (مناسب لبيئة Render)
 CORS(app) 
+# في ملف web_agent.py بعد سطر CORS(app)
+
+@app.route('/', methods=['GET'])
+def home():
+    """الرد على طلبات GET للمسار الأساسي (Health Check)."""
+    return jsonify({
+        "status": "OK",
+        "message": "Soil Agent API is running.",
+        "version": "1.0"
+    }), 200
 
 @app.route('/api/analyze_soil', methods=['POST'])
 def api_analyze_soil():
+# ... (بقية الكود)
     data = request.json
     try:
         # ملاحظة: تم تعديل طريقة استخراج البيانات لضمان عدم حدوث خطأ إذا كانت فارغة
@@ -265,3 +276,4 @@ if __name__ == '__main__':
     # إذا كنت تستخدم Render، تأكد من أنك تستخدم gunicorn أو waitress بدلاً من app.run(debug=True)
     # على سبيل المثال: app.run(host='0.0.0.0', port=os.environ.get('PORT', 5000))
     app.run(debug=True)
+
