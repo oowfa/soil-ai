@@ -155,7 +155,7 @@ def generate_detailed_report(selected_crop, area_sqm, soil_type, location_name, 
 # خادم Flask
 # -----------------------------------------------------
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # صفحة رئيسية
@@ -213,3 +213,4 @@ if __name__ == '__main__':
     print("تم تشغيل المحاكاة بنجاح على http://0.0.0.0:5000")
     print("-----------------------------------------------------")
     app.run(host='0.0.0.0', port=5000, debug=True)
+
