@@ -175,7 +175,7 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 # صفحة رئيسية بسيطة
 @app.route('/')
 def home():
-    return "<h2>خادم Soil AI يعمل بنجاح! استخدم /api/analyze_soil و /api/generate_plan</h2>"
+    return render_template('index_final.html')
 
 @app.route('/api/analyze_soil', methods=['POST'])
 def api_analyze_soil():
@@ -219,5 +219,6 @@ if __name__ == '__main__':
     print("تم تشغيل المحاكاة بنجاح على http://127.0.0.1:5000")
     print("-----------------------------------------------------")
     app.run(host='0.0.0.0', port=5000, debug=True)
+
 
 
