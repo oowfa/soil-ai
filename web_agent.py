@@ -1,24 +1,25 @@
-# -*- coding: utf-8 -*-
+# -- coding: utf-8 --
+
 # -----------------------------------------------------
-# خادم Flask لمحاكاة واجهة AI التربة بدون نموذج حقيقي
+# خادم Flask لمحاكاة واجهة AI التربة بدون نموذج حقيقي.
 # -----------------------------------------------------
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import random
-from werkzeug.utils import secure_filename
+import time # تم إضافة لاستخدامه في التقرير
 
 # -----------------------------------------------------
 # ثوابت وبيانات
 # -----------------------------------------------------
-APP_ID = 'soil_agent_app'
-UPLOAD_FOLDER = 'uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+APP_ID = 'soil_agent_app'
+BASE_IMAGE_DIR = '' 
 IMG_SIZE = (224, 224)
 CLASS_NAMES = ['Alluvial_Soil','Black_Soil','Laterite_Soil','Red_Soil','Yellow_Soil']
 
+# بيانات المحاصيل
 CROP_PROPERTIES = {
     'تمر': [0.4, 0.7, 0.9, 8000],
     'عنب': [0.6, 0.5, 0.7, 15000],
@@ -31,14 +32,16 @@ CROP_PROPERTIES = {
     'بطيخ': [0.7, 0.5, 0.7, 30000]
 }
 
-BASE_COSTS_PER_HA = { 
+BASE_COSTS_PER_HA = {
     'seed_dzd': 50000, 'water_dzd': 70000, 'fertilizer_dzd': 40000, 
     'pesticide_dzd': 20000, 'labor_dzd': 120000
 }
+
 PRICE_PER_KG_DZD = {
     'تمر': 450, 'عنب': 200, 'طماطم': 80, 'بطاطا': 60, 
     'قمح_صلب': 50, 'شعير': 40, 'زيتون': 350, 'بقوليات': 150, 'بطيخ': 70
 }
+
 WATER_NEED_M3_HA = {
     'تمر': 5000, 'عنب': 6500, 'طماطم': 9000, 'بطاطا': 7500, 
     'قمح_صلب': 4500, 'شعير': 4000, 'زيتون': 3000, 'بقوليات': 5500, 'بطيخ': 7000
@@ -56,15 +59,31 @@ GLOBAL_HISTORICAL_ANALYSIS = None
 # -----------------------------------------------------
 # دوال المحاكاة
 # -----------------------------------------------------
-def predict_soil_type(image_path=None):
-    """إرجاع نوع تربة عشوائي دائمًا بدون تحليل الصورة."""
+
+def predict_soil_type(image_path):
+    """محاكاة تحليل صورة التربة بدون نموذج ML حقيقي."""
+    if not image_path:
+        return random.choice(CLASS_NAMES)
+
+    name_lower = image_path.lower()
+    if "red" in name_lower:
+        return "Red_Soil"
+    elif "black" in name_lower:
+        return "Black_Soil"
+    elif "alluvial" in name_lower:
+        return "Alluvial_Soil"
+    elif "yellow" in name_lower:
+        return "Yellow_Soil"
+    elif "laterite" in name_lower:
+        return "Laterite_Soil"
+
     return random.choice(CLASS_NAMES)
 
 def determine_suitability(soil_type, area_sqm, prev_crops_str, farmer_pref, desired_crop, historical_analysis=None):
     area_ha = area_sqm / 10000
     prev_crops = [c.strip().lower() for c in prev_crops_str.split(',') if c.strip()]
     suitability_scores = []
-    
+
     SOIL_BONUS = {
         'Alluvial_Soil': { 'تمر': 1.2, 'قمح_صلب': 1.1, 'طماطم': 1.05 },
         'Black_Soil': { 'قمح_صلب': 1.15, 'بطاطا': 1.1, 'بطيخ': 1.0 },
@@ -82,8 +101,10 @@ def determine_suitability(soil_type, area_sqm, prev_crops_str, farmer_pref, desi
             base_score *= (1 + profit_ratio * 0.3)
         elif farmer_pref == 'low_water':
             base_score *= (1 + (1 - water_need) * 0.3)
-        elif farmer_pref == 'improve_efficiency' and historical_analysis:
-            base_score *= (1 + historical_analysis.get('water_efficiency_ratio', 0) * 0.1)
+        # تمكين الاستفادة من التحليل التاريخي هنا
+        elif farmer_pref == 'improve_efficiency' and historical_analysis and 'water_efficiency_ratio' in historical_analysis:
+            # مثال: زيادة النتيجة بناءً على كفاءة الماء التاريخية
+            base_score *= (1 + historical_analysis.get('water_efficiency_ratio', 0) * 0.05) 
 
         if crop.lower() in prev_crops:
             base_score *= 0.8
@@ -101,10 +122,13 @@ def generate_detailed_report(selected_crop, area_sqm, soil_type, location_name, 
     area_ha = area_sqm / 10000
     details = CROP_PROPERTIES.get(selected_crop)
     current_score = next((r['score'] for r in recommendations if r['crop'] == selected_crop), 0.0)
-    
+
+    # التحقق من وجود بيانات للمحصول المحدد
     if not details:
-        return "خطأ: لا توجد بيانات تفصيلية للمحصول المحدد."
-    
+        # إذا لم يتم العثور على المحصول في بيانات CROP_PROPERTIES
+        # يجب أن يكون هذا المحصول مختاراً من قائمة التوصيات
+        return "خطأ: لا توجد بيانات تفصيلية (CROP_PROPERTIES) للمحصول المحدد. يرجى اختيار محصول من القائمة المقترحة."
+
     base_cost_per_ha = sum(BASE_COSTS_PER_HA.values())
     total_cost = base_cost_per_ha * area_ha
     expected_yield_kg_ha = details[3]
@@ -119,67 +143,57 @@ def generate_detailed_report(selected_crop, area_sqm, soil_type, location_name, 
         'Laterite_Soil': 'تربة لاتيريتية', 'Red_Soil': 'تربة حمراء',
         'Yellow_Soil': 'تربة صفراء'
     }.get(soil_type, 'غير محدد')
+    
+    # تنسيق التاريخ والوقت بشكل أفضل
+    report_date = time.strftime("%Y-%m-%d %H:%M:%S")
 
     report = f"""
-**=====================================================**
+=====================================================
 ** تقرير الخطة الزراعية والمالية التفصيلي للموسم**
-**=====================================================**
+=====================================================
+الموقع: {location_name}
+تاريخ التقرير: {report_date}
+نوع التربة المُحدد: {soil_type_ar}
 
-**الموقع:** {location_name}
-**تاريخ التقرير:** {os.times()[4]}
-**نوع التربة المُحدد:** {soil_type_ar}
+I. التوصية الرئيسية والملاءمة
+المحصول المقترح: {selected_crop}
+مستوى الملاءمة: {current_score:.1f}%
 
-## I. التوصية الرئيسية والملاءمة
-**المحصول المقترح:** {selected_crop}
-**مستوى الملاءمة:** {current_score:.1f}%
-
-## II. الخطة المالية المتوقعة (لـ {area_ha:.2f} هكتار)
+II. الخطة المالية المتوقعة (لـ {area_ha:.2f} هكتار)
 | البند | التقدير (د.ج) |
 | :--- | :--- |
-| **الإيرادات الكلية** | {total_revenue:,.0f} |
-| **إجمالي التكاليف** | **{total_cost:,.0f}** |
-| **الربح الصافي المتوقع** | **{net_profit:,.0f} |
+| الإيرادات الكلية | {total_revenue:,.0f} |
+| إجمالي التكاليف | {total_cost:,.0f} |
+| الربح الصافي المتوقع | **{net_profit:,.0f}** |
 
-## III. المؤشرات الزراعية
+III. المؤشرات الزراعية
 | المؤشر | القيمة | الوحدة |
 | :--- | :--- | :--- |
-| **المساحة الكلية** | {area_sqm:,.0f} | م² |
-| **المردود المتوقع** | {expected_yield:,.0f} | كغم |
-| **الاحتياج المائي الكلي** | {water_need_m3:,.0f} | م³ |
-
-**=====================================================**
+| المساحة الكلية | {area_sqm:,.0f} | م² |
+| المردود المتوقع | {expected_yield:,.0f} | كغم |
+| الاحتياج المائي الكلي | {water_need_m3:,.0f} | م³ |
+=====================================================
 """
     return report.strip()
 
 # -----------------------------------------------------
 # خادم Flask
 # -----------------------------------------------------
+
 app = Flask(__name__)
-CORS(app)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# تم تعديل CORS للسماح بجميع الأصول (مناسب لبيئة Render)
+CORS(app) 
 
-# صفحة رئيسية
-@app.route('/')
-def home():
-    return render_template('index_final.html')
-
-# تحليل التربة
 @app.route('/api/analyze_soil', methods=['POST'])
 def api_analyze_soil():
+    data = request.json
     try:
-        # استقبال الصورة
-        if 'image' in request.files:
-            f = request.files['image']
-            filename = secure_filename(f.filename)
-            image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            f.save(image_path)
-        else:
-            image_path = "random.jpg"
-
-        area_sqm = float(request.form.get('area_sqm', 1000))
-        prev_crops_str = request.form.get('prev_crops_str', '')
-        farmer_pref = PREF_OPTIONS_MAP.get(request.form.get('farmer_pref'), 'none')
-        desired_crop = request.form.get('desired_crop', None)
+        # ملاحظة: تم تعديل طريقة استخراج البيانات لضمان عدم حدوث خطأ إذا كانت فارغة
+        image_path = data.get('image_path')
+        area_sqm = float(data.get('area_sqm', 10000)) # افتراض قيمة إذا كانت مفقودة
+        prev_crops_str = data.get('prev_crops_str', '')
+        farmer_pref = data.get('farmer_pref', 'none')
+        desired_crop = data.get('desired_crop', '')
 
         soil_type = predict_soil_type(image_path)
         recommendations = determine_suitability(
@@ -188,17 +202,21 @@ def api_analyze_soil():
 
         return jsonify({'soil_type': soil_type, 'recommendations': recommendations})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f"خطأ في تحليل التربة: {str(e)}"}), 500
 
-# توليد خطة مفصلة
 @app.route('/api/generate_plan', methods=['POST'])
 def api_generate_plan():
+    data = request.json
     try:
-        selected_crop = request.form.get('selected_crop')
-        area_sqm = float(request.form.get('area_sqm', 1000))
-        soil_type = request.form.get('soil_type', 'Alluvial_Soil')
-        location_name = request.form.get('location_name', 'الموقع الافتراضي')
-        recommendations = []  # يمكن توسيعها لاحقًا
+        selected_crop = data.get('selected_crop')
+        # تحقق إضافي لضمان وجود المحصول قبل إرساله للتقرير
+        if not selected_crop or selected_crop not in CROP_PROPERTIES:
+            return jsonify({'error': "لم يتم تحديد المحصول بشكل صحيح أو لا توجد بيانات لهذا المحصول."}), 400
+            
+        area_sqm = float(data.get('area_sqm', 10000))
+        soil_type = data.get('soil_type')
+        location_name = data.get('location_name')
+        recommendations = data.get('recommendations', [])
 
         report_text = generate_detailed_report(
             selected_crop, area_sqm, soil_type, location_name, recommendations, GLOBAL_HISTORICAL_ANALYSIS
@@ -206,11 +224,44 @@ def api_generate_plan():
 
         return jsonify({'report': report_text})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f"خطأ في توليد الخطة: {str(e)}"}), 500
+
+# تم إضافة هذه الدالة لحل مشكلة 404
+@app.route('/api/analyze_historical', methods=['POST'])
+def api_analyze_historical():
+    global GLOBAL_HISTORICAL_ANALYSIS
+    data = request.json
+    try:
+        actual_yield = float(data.get('actual_yield', 0))
+        area_sqm = float(data.get('area_sqm', 10000))
+        actual_water = float(data.get('actual_water', 1)) 
+        
+        if actual_water <= 0:
+             return jsonify({'error': "يجب أن تكون كمية الماء المستخدم أكبر من صفر."}), 400
+        if actual_yield <= 0:
+             return jsonify({'error': "يجب أن يكون المردود الفعلي أكبر من صفر."}), 400
+             
+        area_ha = area_sqm / 10000
+        
+        # حساب كفاءة الماء (المردود لكل م³ ماء)
+        water_efficiency_ratio = (actual_yield / area_ha) / actual_water
+        
+        # تحديث المتغير العام
+        GLOBAL_HISTORICAL_ANALYSIS = {
+            'previous_crop': data.get('crop'),
+            'water_efficiency_ratio': water_efficiency_ratio,
+            'message': f"تم تحليل الأداء التاريخي لـ {data.get('crop')} بنجاح. كفاءة الماء: {water_efficiency_ratio:.2f} كغم/م³."
+        }
+        
+        return jsonify({'message': GLOBAL_HISTORICAL_ANALYSIS['message'], 'analysis': GLOBAL_HISTORICAL_ANALYSIS})
+
+    except Exception as e:
+        return jsonify({'error': f"خطأ في معالجة البيانات التاريخية: {str(e)}"}), 500
 
 if __name__ == '__main__':
     print("-----------------------------------------------------")
-    print("تم تشغيل المحاكاة بنجاح على http://0.0.0.0:5000")
+    print("تم تشغيل المحاكاة بنجاح.")
     print("-----------------------------------------------------")
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
+    # إذا كنت تستخدم Render، تأكد من أنك تستخدم gunicorn أو waitress بدلاً من app.run(debug=True)
+    # على سبيل المثال: app.run(host='0.0.0.0', port=os.environ.get('PORT', 5000))
+    app.run(debug=True)
