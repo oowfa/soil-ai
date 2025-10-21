@@ -1,9 +1,9 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*- 
 # -----------------------------------------------------
 # خادم Flask لمحاكاة واجهة AI التربة بدون نموذج حقيقي.
 # -----------------------------------------------------
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import os
 import random
@@ -154,6 +154,7 @@ def generate_detailed_report(selected_crop, area_sqm, soil_type, location_name, 
 | **إجمالي التكاليف** | **{total_cost:,.0f}** |
 | **الربح الصافي المتوقع** | **{net_profit:,.0f} |
 
+
 ## III. المؤشرات الزراعية
 | المؤشر | القيمة | الوحدة |
 | :--- | :--- | :--- |
@@ -170,6 +171,11 @@ def generate_detailed_report(selected_crop, area_sqm, soil_type, location_name, 
 # -----------------------------------------------------
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# صفحة رئيسية بسيطة
+@app.route('/')
+def home():
+    return "<h2>خادم Soil AI يعمل بنجاح! استخدم /api/analyze_soil و /api/generate_plan</h2>"
 
 @app.route('/api/analyze_soil', methods=['POST'])
 def api_analyze_soil():
@@ -212,4 +218,6 @@ if __name__ == '__main__':
     print("-----------------------------------------------------")
     print("تم تشغيل المحاكاة بنجاح على http://127.0.0.1:5000")
     print("-----------------------------------------------------")
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
+
