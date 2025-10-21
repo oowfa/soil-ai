@@ -55,24 +55,11 @@ GLOBAL_HISTORICAL_ANALYSIS = None
 # -----------------------------------------------------
 # دوال المحاكاة
 # -----------------------------------------------------
-def predict_soil_type(image_path):
-    """محاكاة تحليل صورة التربة بدون نموذج ML حقيقي."""
-    if not image_path:
-        return random.choice(CLASS_NAMES)
-    
-    name_lower = image_path.lower()
-    if "red" in name_lower:
-        return "Red_Soil"
-    elif "black" in name_lower:
-        return "Black_Soil"
-    elif "alluvial" in name_lower:
-        return "Alluvial_Soil"
-    elif "yellow" in name_lower:
-        return "Yellow_Soil"
-    elif "laterite" in name_lower:
-        return "Laterite_Soil"
-    
+def predict_soil_type(image_path=None):
+    """إرجاع نوع تربة عشوائي دائمًا بدون تحليل الصورة."""
+    import random
     return random.choice(CLASS_NAMES)
+
 
 def determine_suitability(soil_type, area_sqm, prev_crops_str, farmer_pref, desired_crop, historical_analysis=None):
     area_ha = area_sqm / 10000
@@ -219,6 +206,7 @@ if __name__ == '__main__':
     print("تم تشغيل المحاكاة بنجاح على http://127.0.0.1:5000")
     print("-----------------------------------------------------")
     app.run(host='0.0.0.0', port=5000, debug=True)
+
 
 
 
